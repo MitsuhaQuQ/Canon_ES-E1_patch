@@ -197,18 +197,6 @@ Eos1v.drv  <- Eos1v.original.drv
 
 After verifying the restored files, `EOSHOOKX.dll` and `EOSBRIDGE.LOG` may be removed from that application directory.
 
-## Repository contents
-
-```text
-EOS1V_Patcher.exe                  self-contained release patcher
-eos_probe.exe                      standalone WinUSB probe
-EOS1V-WinUSB.inf                   reference WinUSB INF
-EOS1V_Windows11_操作说明.md         Chinese installation and usage guide
-EOS1V_Windows11_实现原理.md         Chinese implementation notes
-EOS1V_发布结构说明.md               Chinese distribution notes
-source/                             complete C source and build scripts
-```
-
 ## Distribution and legal note
 
 This repository is intended to distribute independently written interoperability code. It does not include Canon `Remote.exe`, `Eos1v.drv`, `Memory.exe`, modified copies of those files, or binary deltas that reconstruct them. Patching occurs only on files supplied locally by the user.
