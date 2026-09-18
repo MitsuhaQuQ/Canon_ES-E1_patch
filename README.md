@@ -93,7 +93,7 @@ A forced process termination or crash cannot guarantee that this final exchange 
 
 ## Patcher safeguards
 
-The native x64 patcher uses Windows CNG for SHA-256 and has no PowerShell, Python, or external runtime dependency.
+The native x64 patcher uses Windows CNG for SHA-256.
 
 It performs these checks and operations locally:
 
@@ -112,10 +112,7 @@ Supported hashes:
 | File | State | SHA-256 |
 | --- | --- | --- |
 | `Remote.exe` | original | `0B3DC2A9CC1EE3690E08B4D0DE52EAACC46F1182922E9B93C94E43CF7BB10C89` |
-| `Remote.exe` | locally patched | `0A8DAC759136C55D89CA139649C1950D6F7B96F3031B55853A121F1CF900D6B0` |
 | `Eos1v.drv` | original | `B224AE5492BA644A5B5F228DBD7D1E1AF1AAEC7E880FB9DC56D0E0E47FEC66C5` |
-| `Eos1v.drv` | locally patched | `F497B4E975462478FFA7366D067F0316085FA5FE312F86A50205F1E84A407CED` |
-| embedded `EOSHOOKX.dll` | tested release | `99F83B1DFAD538F42EE057DF267974871827EB8DBE6CB54FC482F40C69303091` |
 
 The two local import-name changes are:
 
@@ -162,7 +159,7 @@ The build produces:
 
 The final patcher build calculates the newly built DLL's SHA-256, generates `bridge_hash.h`, compiles `eos1v_patcher.rc`, and embeds the DLL as an `RCDATA` resource. The resulting EXE is therefore paired automatically with the bridge from the same build.
 
-See [`source/SOURCE_PROJECT.md`](source/SOURCE_PROJECT.md) for the source layout and individual build commands.
+See [`SOURCE_PROJECT.md`](SOURCE_PROJECT.md) for the source layout and individual build commands.
 
 ## Troubleshooting
 
