@@ -19,7 +19,7 @@ The following operations have been tested with a real EOS-1V and ES-E1 on Window
 - synchronizing the camera date and time;
 - downloading film shooting records;
 - converting transferred temporary data into sequential `.EFD` files;
-- automatically opening `Memory.exe` after a transfer;
+- automatically opening `Memory.exe` after a transfer as intended;
 - adding downloaded rolls to the Memory database;
 - starting the Canon application from a shortcut or a different working directory;
 - performing the complete camera exit sequence when Remote is closed normally.
@@ -53,7 +53,7 @@ The bridge also fixes several assumptions made by the legacy application:
 - Canon EOS-1V;
 - Canon ES-E1 USB interface;
 - a complete original EOS LINK ES-E1 program directory;
-- the ES-E1 USB device bound to Microsoft's WinUSB driver.
+- the ES-E1 USB device bound to Microsoft's WinUSB driver.(Use ['zadig'](https://zadig.akeo.ie/)
 
 The device used for development reports:
 
