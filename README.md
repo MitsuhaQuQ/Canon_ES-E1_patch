@@ -4,9 +4,13 @@ THIS PATCH IS AI GENERATED but HUMAN TESTED.
 ## About
  The CANON EOS 1v's customization needs a wire called ES-E1, and it needs a PC software.  
  But the software only provides 32bit drivers that only runs on windows XP.  
+ As intended, windows **CAN** run a 32bit user-mode software on a 64-bit installation. **But the driver can't.**  
+ Without the driver the software is useless.  
  This project allows the official 32-bit Canon **EOS LINK ES-E1** software to communicate with EOS-1V through the ES-E1 USB interface on 64-bit Windows 11.  
 
 It provides a native WinUSB compatibility bridge and a self-contained patcher. The release does **not** contain Canon executables, drivers, modified Canon files, or binary patches capable of recreating them. You must supply your own lawfully obtained EOS LINK ES-E1 installation.  
+**You don't need the official driver to run the software anymore.**  
+
 ## Requirements
 
 - 64-bit Windows 10 or Windows 11;
