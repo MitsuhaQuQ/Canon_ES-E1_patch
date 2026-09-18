@@ -11,6 +11,8 @@ THIS PATCH IS AI GENERATED but HUMAN TESTED.
 It provides a native WinUSB compatibility bridge and a self-contained patcher. The release does **not** contain Canon executables, drivers, modified Canon files, or binary patches capable of recreating them. You must supply your own lawfully obtained EOS LINK ES-E1 installation.  
 **You don't need the official driver to run the software anymore.**  
 
+**This patch also removed the requirement of registry entry of the complete installation, so it should works even copied to anywhere.** 
+
 ## Requirements
 
 - 64-bit Windows 10 or Windows 11;
