@@ -1,0 +1,22 @@
+LIBRARY EOSHOOKX
+EXPORTS
+ SetCommState=_HookSetCommState@8
+ GetCommState=_HookGetCommState@8
+ CreateFileA=_HookCreateFileA@28
+ lstrcatA=_HooklstrcatA@8
+ CreateSemaphoreA=_HookCreateSemaphoreA@16
+ CloseHandle=_HookCloseHandle@4
+ WaitForSingleObject=_HookWaitForSingleObject@8
+ ReleaseSemaphore=_HookReleaseSemaphore@12
+ WriteFile=_HookWriteFile@20
+ ReadFile=_HookReadFile@20
+ DisableThreadLibraryCalls=_HookDisableThreadLibraryCalls@4
+ SetCommTimeouts=_HookSetCommTimeouts@8
+ Sleep=_HookSleep@4
+ RegCloseKey=_HookRegCloseKey@4
+ RegCreateKeyExA=_HookRegCreateKeyExA@36
+ RegEnumValueA=_HookRegEnumValueA@32
+ RegOpenKeyExA=_HookRegOpenKeyExA@20
+ RegQueryInfoKeyA=_HookRegQueryInfoKeyA@48
+ RegQueryValueExA=_HookRegQueryValueExA@24
+ RegSetValueExA=_HookRegSetValueExA@24

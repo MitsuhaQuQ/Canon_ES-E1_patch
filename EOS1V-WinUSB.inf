@@ -1,0 +1,31 @@
+[Version]
+Signature="$Windows NT$"
+Class=USBDevice
+ClassGuid={88BAE032-5A81-49F0-BC3D-A4FF138216D6}
+Provider=%ProviderName%
+DriverVer=09/19/2026,1.0.0.0
+CatalogFile=EOS1V-WinUSB.cat
+
+[Manufacturer]
+%ProviderName%=DeviceList,NTamd64
+
+[DeviceList.NTamd64]
+%DeviceName%=WinUSB_Install,USB\VID_04A9&PID_3040
+
+[WinUSB_Install]
+Include=winusb.inf
+Needs=WINUSB.NT
+
+[WinUSB_Install.Services]
+Include=winusb.inf
+Needs=WINUSB.NT.Services
+
+[WinUSB_Install.HW]
+AddReg=Dev_AddReg
+
+[Dev_AddReg]
+HKR,,DeviceInterfaceGUIDs,0x10000,"{290DECB5-2458-41EC-87A8-4D09BDD20CE2}"
+
+[Strings]
+ProviderName="EOS-1V Compatibility Project"
+DeviceName="Canon EOS-1V ES-E1 (WinUSB)"
