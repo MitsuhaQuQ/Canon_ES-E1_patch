@@ -53,7 +53,7 @@ The bridge also fixes several assumptions made by the legacy application:
 - Canon EOS-1V;
 - Canon ES-E1 USB interface;
 - a complete original EOS LINK ES-E1 program directory;
-- the ES-E1 USB device bound to Microsoft's WinUSB driver.(Use ['zadig'](https://zadig.akeo.ie/)
+- the ES-E1 USB device bound to Microsoft's WinUSB driver.(Use ['zadig'](https://zadig.akeo.ie/) )
 
 The device used for development reports:
 
@@ -61,9 +61,6 @@ The device used for development reports:
 USB\VID_04A9&PID_3040
 ```
 
-`EOS1V-WinUSB.inf` is included as a reference INF. It does not contain a signed catalog. A normal Secure Boot installation therefore requires a properly signed package or a trusted WinUSB binding tool.
-
-If VMware is running the Windows XP installation, disconnect the ES-E1 from the virtual machine before using it on the Windows host.
 
 ## Quick start
 
