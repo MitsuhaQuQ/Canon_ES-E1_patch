@@ -24,14 +24,14 @@ USB\VID_04A9&PID_3040
 ```
 
 ## How to Use
- **0. You need an origional ES-E1 hardware.**
- 1.Plug the ES-E1 to your computer.
- 2.Use ['Zadig'](https://zadig.akeo.ie/) to install **WinUSB** driver for the ES-E1(**USB ID 04A9_3040**).
- 3.Get canon's origional software from anywhere.
- 4.Download and Copy the patcher into the program folder where the Remote.exe and Memory.exe lives.
- 5.Run the patcher.
- **If the Canon directory is under `Program Files`, run the patcher with administrator.**
- 6.Use the new patched Remote.exe as origional one. Everything should work as intended.
+ **0. You need an origional ES-E1 hardware.**  
+ 1.Plug the ES-E1 to your computer.  
+ 2.Use ['Zadig'](https://zadig.akeo.ie/) to install **WinUSB** driver for the ES-E1(**USB ID 04A9_3040**).  
+ 3.Get canon's origional software from anywhere.  
+ 4.Download and Copy the patcher into the program folder where the Remote.exe and Memory.exe lives.  
+ 5.Run the patcher.  
+ **If the Canon directory is under `Program Files`, run the patcher with administrator.**  
+ 6.Use the new patched Remote.exe as origional one. Everything should work as intended.  
 
 
 ## What works
