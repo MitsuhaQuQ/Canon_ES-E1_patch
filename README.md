@@ -9,6 +9,30 @@ THIS PATCH IS AI GENERATED but HUMAN TESTED.
  This project allows the original 32-bit Canon **EOS LINK ES-E1** software to communicate with an EOS-1V through the ES-E1 USB interface on 64-bit Windows 11.
 
 It provides a native WinUSB compatibility bridge and a self-contained patcher. The release does **not** contain Canon executables, drivers, modified Canon files, or binary patches capable of recreating them. You must supply your own lawfully obtained EOS LINK ES-E1 installation.
+## Requirements
+
+- 64-bit Windows 10 or Windows 11;
+- Canon EOS-1V;
+- Canon ES-E1 USB interface;
+- a complete original EOS LINK ES-E1 program directory;
+- the ES-E1 USB device bound to Microsoft's WinUSB driver.(Use ['zadig'](https://zadig.akeo.ie/) )
+
+The device used for development reports:
+
+```text
+USB\VID_04A9&PID_3040
+```
+
+## How to Use
+ **0. You need an origional ES-E1 hardware.**
+ 1.Plug the ES-E1 to your computer.
+ 2.Use ['Zadig'](https://zadig.akeo.ie/) to install **WinUSB** driver for the ES-E1(**USB ID 04A9_3040**).
+ 3.Get canon's origional software from anywhere.
+ 4.Download and Copy the patcher into the program folder where the Remote.exe and Memory.exe lives.
+ 5.Run the patcher.
+ **If the Canon directory is under `Program Files`, run the patcher with administrator.**
+ 6.Use the new patched Remote.exe as origional one. Everything should work as intended.
+
 
 ## What works
 
@@ -47,33 +71,9 @@ The bridge also fixes several assumptions made by the legacy application:
 - keeping the camera in PC mode between operations;
 - sending the observed two-stage exit exchange when Remote closes normally.
 
-## Requirements
-
-- 64-bit Windows 10 or Windows 11;
-- Canon EOS-1V;
-- Canon ES-E1 USB interface;
-- a complete original EOS LINK ES-E1 program directory;
-- the ES-E1 USB device bound to Microsoft's WinUSB driver.(Use ['zadig'](https://zadig.akeo.ie/) )
-
-The device used for development reports:
-
-```text
-USB\VID_04A9&PID_3040
-```
 
 
-## Quick start
 
-1. Close `Remote.exe` and `Memory.exe`.
-2. Make a separate backup of the complete original EOS LINK ES-E1 directory.
-3. Bind the ES-E1 device to WinUSB on the Windows host.
-4. Drag the complete original EOS LINK ES-E1 folder onto `EOS1V_Patcher.exe`.
-5. Put the camera explicitly into **PC mode**.
-6. Start the patched `Remote.exe`.
-
-Alternatively, copy only `EOS1V_Patcher.exe` into the original EOS LINK ES-E1 directory and run it there. `EOSHOOKX.dll` is embedded in the patcher and is released automatically; no separately matched DLL is required.
-
-If the Canon directory is under `Program Files`, run the patcher with administrator rights.
 
 
 ## Camera mode warning
