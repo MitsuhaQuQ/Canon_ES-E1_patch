@@ -16,6 +16,8 @@ static const wchar_t REMOTE_ORIGINAL_HASH[] = L"0B3DC2A9CC1EE3690E08B4D0DE52EAAC
 static const wchar_t REMOTE_PATCHED_HASH[]  = L"0A8DAC759136C55D89CA139649C1950D6F7B96F3031B55853A121F1CF900D6B0";
 static const wchar_t DRIVER_ORIGINAL_HASH[] = L"B224AE5492BA644A5B5F228DBD7D1E1AF1AAEC7E880FB9DC56D0E0E47FEC66C5";
 static const wchar_t DRIVER_PATCHED_HASH[]  = L"F497B4E975462478FFA7366D067F0316085FA5FE312F86A50205F1E84A407CED";
+static const wchar_t MEMORY_ORIGINAL_HASH[] = L"BE9EA465AF03169AA19BC36DFFA9FDE0D3A8188D30B68DC164EB0A1493224F77";
+static const wchar_t MEMORY_PATCHED_HASH[]  = L"49219D7A1290F8FC148EB4D8E8078D691730EE974FF6AA22757A2C42BFD67C87";
 static const wchar_t BRIDGE_HASH[]          = EOS1V_EXPECTED_BRIDGE_HASH;
 
 static void set_error(const wchar_t *format, ...){
@@ -202,6 +204,7 @@ static void cleanup_legacy_files(const wchar_t *target){
     wchar_t path[MAX_PATH];
     if(path_join(path,ARRAYSIZE(path),target,L"Remote_hooked.exe"))DeleteFileW(path);
     if(path_join(path,ARRAYSIZE(path),target,L"Eos1v_hooked.drv"))DeleteFileW(path);
+    if(path_join(path,ARRAYSIZE(path),target,L"Memory_hooked.exe"))DeleteFileW(path);
 }
 
 int wmain(int argc,wchar_t **argv){
@@ -209,6 +212,8 @@ int wmain(int argc,wchar_t **argv){
     static const BYTE remote_new[]="EOSHOOKX.dll";
     static const BYTE driver_old[]="KERNEL32.dll";
     static const BYTE driver_new[]="EOSHOOKX.dll";
+    static const BYTE memory_old[]="KERNEL32.dll";
+    static const BYTE memory_new[]="EOSHOOKX.dll";
     wchar_t source_directory[MAX_PATH],target[MAX_PATH],memory[MAX_PATH],message[1400],no_ui[2];
     DWORD attributes;
     BOOL show_ui=GetEnvironmentVariableW(L"EOS1V_PATCHER_NO_UI",no_ui,ARRAYSIZE(no_ui))==0;
@@ -220,9 +225,10 @@ int wmain(int argc,wchar_t **argv){
     attributes=GetFileAttributesW(target);
     if(attributes==INVALID_FILE_ATTRIBUTES||!(attributes&FILE_ATTRIBUTE_DIRECTORY)){set_error(L"Drop the complete Canon EOS LINK ES-E1 folder onto this EXE, or run the EXE from inside that folder.");goto failed;}
     if(!path_join(memory,ARRAYSIZE(memory),target,L"Memory.exe")||!file_exists(memory)){set_error(L"Memory.exe was not found. Select the complete Canon EOS LINK ES-E1 folder.");goto failed;}
-    if(sizeof(remote_old)!=sizeof(remote_new)||sizeof(driver_old)!=sizeof(driver_new)){set_error(L"Internal import patch length mismatch.");goto failed;}
+    if(sizeof(remote_old)!=sizeof(remote_new)||sizeof(driver_old)!=sizeof(driver_new)||sizeof(memory_old)!=sizeof(memory_new)){set_error(L"Internal import patch length mismatch.");goto failed;}
     if(!patch_one(target,L"Remote.exe",L"Remote.original.exe",REMOTE_ORIGINAL_HASH,REMOTE_PATCHED_HASH,remote_old,remote_new,sizeof(remote_old)))goto failed;
     if(!patch_one(target,L"Eos1v.drv",L"Eos1v.original.drv",DRIVER_ORIGINAL_HASH,DRIVER_PATCHED_HASH,driver_old,driver_new,sizeof(driver_old)))goto failed;
+    if(!patch_one(target,L"Memory.exe",L"Memory.original.exe",MEMORY_ORIGINAL_HASH,MEMORY_PATCHED_HASH,memory_old,memory_new,sizeof(memory_old)))goto failed;
     if(!install_bridge(target))goto failed;
     cleanup_legacy_files(target);
     StringCchPrintfW(message,ARRAYSIZE(message),L"Installation completed and verified.\n\nTarget:\n%s\n\nPut the camera in PC mode before starting Remote.exe.",target);

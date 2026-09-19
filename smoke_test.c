@@ -7,12 +7,11 @@ void main(void){
     typedef BOOL (WINAPI *PF_WRITE)(HANDLE,LPCVOID,DWORD,LPDWORD,LPOVERLAPPED);
     typedef BOOL (WINAPI *PF_READ)(HANDLE,LPVOID,DWORD,LPDWORD,LPOVERLAPPED);
     typedef BOOL (WINAPI *PF_CLOSE)(HANDLE);
-    HMODULE hook=LoadLibraryA("EOSHOOKX.dll"),drv;unsigned i;HANDLE file;DWORD done;BYTE out[4]={0xde,0xad,0xbe,0xef},in[4]={0};
+    HMODULE hook=LoadLibraryA("EOSHOOKX.dll");unsigned i;HANDLE file;DWORD done;BYTE out[4]={0xde,0xad,0xbe,0xef},in[4]={0};
     PF_CREATE create;PF_WRITE write;PF_READ read;PF_CLOSE close;
     if(!hook)ExitProcess(10);for(i=0;i<sizeof(names)/sizeof(names[0]);++i)if(!GetProcAddress(hook,names[i]))ExitProcess(20+i);
-    drv=LoadLibraryA("Eos1v_hooked.drv");if(!drv)ExitProcess(50);if(!GetProcAddress(drv,"kDev_Create")||!GetProcAddress(drv,"kDev_Release"))ExitProcess(51);
     create=(PF_CREATE)GetProcAddress(hook,"CreateFileA");write=(PF_WRITE)GetProcAddress(hook,"WriteFile");read=(PF_READ)GetProcAddress(hook,"ReadFile");close=(PF_CLOSE)GetProcAddress(hook,"CloseHandle");
-    DeleteFileA("bridge-test.bin");file=create("bridge-test.bin",GENERIC_READ|GENERIC_WRITE,0,0,CREATE_ALWAYS,0,0);if(file==INVALID_HANDLE_VALUE)ExitProcess(60);
+    DeleteFileA("bridge-test.bin");SetLastError(ERROR_SUCCESS);file=create("bridge-test.bin",GENERIC_READ|GENERIC_WRITE,0,0,CREATE_ALWAYS,0,0);if(file==INVALID_HANDLE_VALUE)ExitProcess(GetLastError());
     if(!write(file,out,4,&done,0)||done!=4)ExitProcess(61);SetFilePointer(file,0,0,FILE_BEGIN);if(!read(file,in,4,&done,0)||done!=4)ExitProcess(62);
-    if(in[0]!=0xde||in[1]!=0xad||in[2]!=0xbe||in[3]!=0xef)ExitProcess(63);close(file);FreeLibrary(drv);FreeLibrary(hook);DeleteFileA("bridge-test.bin");ExitProcess(0);
+    if(in[0]!=0xde||in[1]!=0xad||in[2]!=0xbe||in[3]!=0xef)ExitProcess(63);close(file);DeleteFileA("bridge-test.bin");FreeLibrary(hook);ExitProcess(0);
 }

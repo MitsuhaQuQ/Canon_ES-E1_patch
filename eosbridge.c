@@ -18,6 +18,8 @@ static const GUID generic_usb_interface =
     {0xA5DCBF10,0x6530,0x11D2,{0x90,0x1F,0x00,0xC0,0x4F,0xB9,0x51,0xED}};
 
 static HMODULE g_module;
+static BOOL g_is_memory_process;
+static char g_module_directory[MAX_PATH];
 static HANDLE g_log = INVALID_HANDLE_VALUE;
 static HANDLE g_comm = INVALID_HANDLE_VALUE;
 static HANDLE g_device = INVALID_HANDLE_VALUE;
@@ -32,8 +34,6 @@ static BYTE g_rx[RX_CAPACITY];
 static DWORD g_rx_head;
 static DWORD g_rx_count;
 static char g_line[8192];
-static char g_transfer_files[16][MAX_PATH];
-static DWORD g_transfer_count;
 static const HKEY g_fake_serial_key=(HKEY)(ULONG_PTR)0xE0510001;
 static void log_line(const char *kind,HANDLE h,const BYTE *data,DWORD size,DWORD requested,DWORD result,DWORD error);
 
@@ -63,88 +63,85 @@ static int is_com_path(const char *s){
     p+=3;if(*p<'0'||*p>'9')return 0;while(*p>='0'&&*p<='9')++p;return *p==0;
 }
 static int equals_i(const char *a,const char *b){if(!a||!b)return 0;while(*a&&*b){if(lower_ascii((unsigned char)*a)!=lower_ascii((unsigned char)*b))return 0;++a;++b;}return *a==0&&*b==0;}
+static int starts_i(const char *text,const char *prefix){if(!text||!prefix)return 0;while(*prefix){if(!*text||lower_ascii((unsigned char)*text)!=lower_ascii((unsigned char)*prefix))return 0;++text;++prefix;}return 1;}
 static const char *find_i(const char *text,const char *part){
     const char *a,*b;if(!text||!part)return 0;
     for(;*text;++text){a=text;b=part;while(*a&&*b&&lower_ascii((unsigned char)*a)==lower_ascii((unsigned char)*b)){++a;++b;}if(!*b)return text;}return 0;
 }
-static void remember_transfer_file(const char *path){DWORD n;if(!path||g_transfer_count>=16)return;n=(DWORD)lstrlenA(path);if(n<4||!equals_i(path+n-4,".tmp")||n>=MAX_PATH)return;CopyMemory(g_transfer_files[g_transfer_count],path,n+1);++g_transfer_count;}
-static int efd_index(const char *name){int i,value=0;if(!name||lstrlenA(name)!=12||lower_ascii(name[0])!='f'||lower_ascii(name[1])!='i'||name[8]!='.'||lower_ascii(name[9])!='e'||lower_ascii(name[10])!='f'||lower_ascii(name[11])!='d')return -1;for(i=2;i<8;++i){if(name[i]<'0'||name[i]>'9')return -1;value=value*10+(name[i]-'0');}return value;}
-static char *put_six(char *p,DWORD value){int i;for(i=5;i>=0;--i){p[i]=(char)('0'+value%10);value/=10;}return p+6;}
-static void finalize_transfer_files(void){
-    char pattern[MAX_PATH],dest[MAX_PATH],*slash=0,*p;WIN32_FIND_DATAA fd;HANDLE find;DWORD i,dir_chars,next=0,error;BOOL ok;int index;
-    if(!g_transfer_count)return;for(p=g_transfer_files[0];*p;++p)if(*p=='\\'||*p=='/')slash=p;if(!slash)return;dir_chars=(DWORD)(slash+1-g_transfer_files[0]);
-    CopyMemory(pattern,g_transfer_files[0],dir_chars);p=pattern+dir_chars;p=put_text(p,"FI*.EFD");*p=0;
-    find=FindFirstFileA(pattern,&fd);if(find!=INVALID_HANDLE_VALUE){do{index=efd_index(fd.cFileName);if(index>=0&&(DWORD)index>=next)next=(DWORD)index+1;}while(FindNextFileA(find,&fd));FindClose(find);}
-    for(i=0;i<g_transfer_count&&next<1000000;++i,++next){CopyMemory(dest,g_transfer_files[i],dir_chars);p=dest+dir_chars;p=put_text(p,"FI");p=put_six(p,next);p=put_text(p,".EFD");*p=0;SetLastError(ERROR_SUCCESS);ok=MoveFileA(g_transfer_files[i],dest);error=GetLastError();log_line("TRANSFER_EFD",0,(const BYTE*)dest,(DWORD)lstrlenA(dest),0,ok,error);}
-    g_transfer_count=0;
+static int main_executable_is(const char *name){char path[MAX_PATH],*p,*base=path;DWORD n=GetModuleFileNameA(0,path,MAX_PATH);if(!n||n>=MAX_PATH)return 0;for(p=path;*p;++p)if(*p=='\\'||*p=='/')base=p+1;return equals_i(base,name);}
+static LPCSTR fix_application_path(LPCSTR path,char fixed[MAX_PATH]){
+    const char *tail=0;DWORD directory_chars,path_chars;
+    if(!path||!g_module_directory[0])return path;
+    if(path[0]=='\\'||path[0]=='/'){
+        if(starts_i(path,"\\DATA\\")||starts_i(path,"/DATA/")||equals_i(path,"\\DATA")||equals_i(path,"/DATA")||(g_is_memory_process&&(equals_i(path,"\\FilmCach.sav")||equals_i(path,"/FilmCach.sav"))))tail=path;
+    }else if(path[0]&&path[1]==':'&&(path[2]=='\\'||path[2]=='/')){
+        if(starts_i(path+2,"\\DATA\\")||starts_i(path+2,"/DATA/")||equals_i(path+2,"\\DATA")||equals_i(path+2,"/DATA")||(g_is_memory_process&&(equals_i(path+2,"\\FilmCach.sav")||equals_i(path+2,"/FilmCach.sav"))))tail=path+2;
+    }
+    if(!tail)return path;directory_chars=(DWORD)lstrlenA(g_module_directory);path_chars=(DWORD)lstrlenA(tail);if(directory_chars+path_chars>=MAX_PATH)return path;
+    CopyMemory(fixed,g_module_directory,directory_chars);CopyMemory(fixed+directory_chars,tail,path_chars+1);return fixed;
 }
-
 static void ensure_log(void){
     char path[MAX_PATH];DWORD n;char *slash=0,*p;
     if(g_log!=INVALID_HANDLE_VALUE)return;
     n=GetModuleFileNameA(g_module,path,MAX_PATH-20);if(!n||n>=MAX_PATH-20)return;
     for(p=path;*p;++p)if(*p=='\\'||*p=='/')slash=p;
     p=slash?slash+1:path;p=put_text(p,"EOSBRIDGE.LOG");*p=0;
-    g_log=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
+    g_log=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);if(g_log!=INVALID_HANDLE_VALUE)SetFilePointer(g_log,0,0,FILE_END);
 }
 static void set_module_directory(void){
     char path[MAX_PATH],*p,*slash=0;DWORD n=GetModuleFileNameA(g_module,path,MAX_PATH);
-    if(!n||n>=MAX_PATH)return;for(p=path;*p;++p)if(*p=='\\'||*p=='/')slash=p;if(!slash)return;*slash=0;SetCurrentDirectoryA(path);
+    if(!n||n>=MAX_PATH)return;for(p=path;*p;++p)if(*p=='\\'||*p=='/')slash=p;if(!slash)return;*slash=0;lstrcpyA(g_module_directory,path);SetCurrentDirectoryA(path);
 }
 static void log_line(const char *kind,HANDLE h,const BYTE *data,DWORD size,DWORD requested,DWORD result,DWORD error){
     char *p=g_line;DWORD written,i,limit=size;
     EnterCriticalSection(&g_log_lock);ensure_log();
     if(g_log==INVALID_HANDLE_VALUE){LeaveCriticalSection(&g_log_lock);return;}
-    p=put_dec(p,GetTickCount());*p++=' ';p=put_text(p,kind);p=put_text(p," h=");p=put_hex32(p,(DWORD)(ULONG_PTR)h);
+    p=put_dec(p,GetTickCount());p=put_text(p," pid=");p=put_dec(p,GetCurrentProcessId());*p++=' ';p=put_text(p,kind);p=put_text(p," h=");p=put_hex32(p,(DWORD)(ULONG_PTR)h);
     p=put_text(p," result=");p=put_dec(p,result);p=put_text(p," requested=");p=put_dec(p,requested);p=put_text(p," size=");p=put_dec(p,size);
     p=put_text(p," error=");p=put_dec(p,error);
     if(data&&size){p=put_text(p," data=");if(limit>2048)limit=2048;for(i=0;i<limit&&p<g_line+sizeof(g_line)-5;++i){p=put_hex_byte(p,data[i]);*p++=' ';}if(limit<size)p=put_text(p,"...");}
     *p++='\r';*p++='\n';WriteFile(g_log,g_line,(DWORD)(p-g_line),&written,0);FlushFileBuffers(g_log);
     LeaveCriticalSection(&g_log_lock);
 }
+static void log_memory_redirect(LPCSTR original,LPCSTR effective){if(original&&effective&&effective!=original)log_line("APPLICATION_PATH_REDIRECT",0,(const BYTE*)effective,(DWORD)lstrlenA(effective),original?(DWORD)lstrlenA(original):0,TRUE,0);}
 
-static HFILE WINAPI Trace_lcreat(LPCSTR path,int attr){
-    HFILE h;DWORD error;SetLastError(ERROR_SUCCESS);h=_lcreat(path,attr);error=GetLastError();
+HFILE WINAPI Trace_lcreat(LPCSTR path,int attr){
+    char fixed[MAX_PATH];LPCSTR effective=fix_application_path(path,fixed);HFILE h;DWORD error;SetLastError(ERROR_SUCCESS);h=_lcreat(effective,attr);error=GetLastError();log_memory_redirect(path,effective);
     log_line("FILE_LCREAT",(HANDLE)(ULONG_PTR)h,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,(DWORD)attr,h!=HFILE_ERROR,error);return h;
 }
-static HFILE WINAPI Trace_lopen(LPCSTR path,int mode){
-    HFILE h;DWORD error;SetLastError(ERROR_SUCCESS);h=_lopen(path,mode);error=GetLastError();
+HFILE WINAPI Trace_lopen(LPCSTR path,int mode){
+    char fixed[MAX_PATH];LPCSTR effective=fix_application_path(path,fixed);HFILE h;DWORD error;SetLastError(ERROR_SUCCESS);h=_lopen(effective,mode);error=GetLastError();log_memory_redirect(path,effective);
     log_line("FILE_LOPEN",(HANDLE)(ULONG_PTR)h,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,(DWORD)mode,h!=HFILE_ERROR,error);return h;
 }
-static UINT WINAPI Trace_lwrite(HFILE h,LPCCH data,UINT size){
+UINT WINAPI Trace_lwrite(HFILE h,LPCCH data,UINT size){
     UINT done;DWORD error;SetLastError(ERROR_SUCCESS);done=_lwrite(h,data,size);error=GetLastError();
     log_line("FILE_LWRITE",(HANDLE)(ULONG_PTR)h,0,done,size,done!=HFILE_ERROR,error);return done;
 }
-static HFILE WINAPI Trace_lclose(HFILE h){
+HFILE WINAPI Trace_lclose(HFILE h){
     HFILE result;DWORD error;SetLastError(ERROR_SUCCESS);result=_lclose(h);error=GetLastError();
     log_line("FILE_LCLOSE",(HANDLE)(ULONG_PTR)h,0,0,0,result!=HFILE_ERROR,error);return result;
 }
-static BOOL WINAPI Trace_CreateDirectoryA(LPCSTR path,LPSECURITY_ATTRIBUTES sa){
-    BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=CreateDirectoryA(path,sa);error=GetLastError();
+BOOL WINAPI Trace_CreateDirectoryA(LPCSTR path,LPSECURITY_ATTRIBUTES sa){
+    char fixed[MAX_PATH];LPCSTR effective=fix_application_path(path,fixed);BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=CreateDirectoryA(effective,sa);error=GetLastError();log_memory_redirect(path,effective);
     log_line("FILE_MKDIR",0,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,0,ok,error);return ok;
 }
-static BOOL WINAPI Trace_MoveFileA(LPCSTR old_path,LPCSTR new_path){
-    BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=MoveFileA(old_path,new_path);error=GetLastError();
+BOOL WINAPI Trace_MoveFileA(LPCSTR old_path,LPCSTR new_path){
+    char fixed_old[MAX_PATH],fixed_new[MAX_PATH];LPCSTR effective_old=fix_application_path(old_path,fixed_old),effective_new=fix_application_path(new_path,fixed_new);BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=MoveFileA(effective_old,effective_new);error=GetLastError();log_memory_redirect(old_path,effective_old);log_memory_redirect(new_path,effective_new);
     log_line("FILE_MOVE_FROM",0,(const BYTE*)old_path,old_path?(DWORD)lstrlenA(old_path):0,0,ok,error);
     log_line("FILE_MOVE_TO",0,(const BYTE*)new_path,new_path?(DWORD)lstrlenA(new_path):0,0,ok,error);return ok;
 }
-static BOOL WINAPI Trace_DeleteFileA(LPCSTR path){
-    BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=DeleteFileA(path);error=GetLastError();
+BOOL WINAPI Trace_DeleteFileA(LPCSTR path){
+    char fixed[MAX_PATH];LPCSTR effective=fix_application_path(path,fixed);BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=DeleteFileA(effective);error=GetLastError();log_memory_redirect(path,effective);
     log_line("FILE_DELETE",0,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,0,ok,error);return ok;
 }
-static UINT WINAPI Trace_GetTempFileNameA(LPCSTR path,LPCSTR prefix,UINT unique,LPSTR output){
-    UINT result;DWORD error;char fixed[MAX_PATH],*p,*slash=0;LPCSTR effective=path;
-    if(equals_i(path,"\\DATA\\")){
-        DWORD n=GetModuleFileNameA(g_module,fixed,MAX_PATH-7);if(n&&n<MAX_PATH-7){
-            for(p=fixed;*p;++p)if(*p=='\\'||*p=='/')slash=p;
-            if(slash){p=slash+1;p=put_text(p,"DATA\\");*p=0;effective=fixed;}
-        }
-    }
+UINT WINAPI Trace_GetTempFileNameA(LPCSTR path,LPCSTR prefix,UINT unique,LPSTR output){
+    UINT result;DWORD error;char fixed[MAX_PATH];LPCSTR effective=path;
+    effective=fix_application_path(path,fixed);
     SetLastError(ERROR_SUCCESS);result=GetTempFileNameA(effective,prefix,unique,output);error=GetLastError();
     log_line("FILE_TEMP_PATH",0,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,unique,result,error);
     log_line("FILE_TEMP_PREFIX",0,(const BYTE*)prefix,prefix?(DWORD)lstrlenA(prefix):0,unique,result,error);
     if(effective!=path)log_line("FILE_TEMP_REDIRECT",0,(const BYTE*)effective,(DWORD)lstrlenA(effective),unique,result,error);
-    log_line("FILE_TEMP_RESULT",0,(const BYTE*)output,output?(DWORD)lstrlenA(output):0,unique,result,error);if(result&&output)remember_transfer_file(output);return result;
+    log_line("FILE_TEMP_RESULT",0,(const BYTE*)output,output?(DWORD)lstrlenA(output):0,unique,result,error);return result;
 }
 static UINT WINAPI Trace_WinExec(LPCSTR command,UINT show){
     static const char legacy_memory[]="\\Memory.exe";char fixed[1024],module[MAX_PATH],*p,*slash=0;LPCSTR effective=command,memory=find_i(command,legacy_memory);UINT result;DWORD error;
@@ -154,12 +151,12 @@ static UINT WINAPI Trace_WinExec(LPCSTR command,UINT show){
             if(slash){p=fixed;*p++='"';CopyMemory(p,module,(SIZE_T)(slash+1-module));p+=(slash+1-module);p=put_text(p,"Memory.exe\"");p=put_text(p,memory+sizeof(legacy_memory)-1);*p=0;effective=fixed;}
         }
     }
-    finalize_transfer_files();SetLastError(ERROR_SUCCESS);result=WinExec(effective,show);error=GetLastError();
+    SetLastError(ERROR_SUCCESS);result=WinExec(effective,show);error=GetLastError();
     log_line("EXEC_COMMAND",0,(const BYTE*)command,command?(DWORD)lstrlenA(command):0,show,result,error);
     if(effective!=command)log_line("EXEC_REDIRECT",0,(const BYTE*)effective,(DWORD)lstrlenA(effective),show,result,error);return result;
 }
 static void *__cdecl Trace_fopen(const char *path,const char *mode){
-    void *f;DWORD error;if(!g_real_fopen)return 0;SetLastError(ERROR_SUCCESS);f=g_real_fopen(path,mode);error=GetLastError();
+    char fixed[MAX_PATH];const char *effective=fix_application_path(path,fixed);void *f;DWORD error;if(!g_real_fopen)return 0;SetLastError(ERROR_SUCCESS);f=g_real_fopen(effective,mode);error=GetLastError();log_memory_redirect(path,effective);
     log_line("FILE_FOPEN",(HANDLE)f,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,mode?(DWORD)(BYTE)mode[0]:0,f!=0,error);return f;
 }
 static size_t __cdecl Trace_fwrite(const void *data,size_t size,size_t count,void *f){
@@ -170,6 +167,10 @@ static int __cdecl Trace_fclose(void *f){
     int result;DWORD error;if(!g_real_fclose)return -1;SetLastError(ERROR_SUCCESS);result=g_real_fclose(f);error=GetLastError();
     log_line("FILE_FCLOSE",(HANDLE)f,0,0,0,result==0,error);return result;
 }
+BOOL WINAPI Trace_CopyFileA(LPCSTR old_path,LPCSTR new_path,BOOL fail_if_exists){char fixed_old[MAX_PATH],fixed_new[MAX_PATH];LPCSTR effective_old=fix_application_path(old_path,fixed_old),effective_new=fix_application_path(new_path,fixed_new);BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=CopyFileA(effective_old,effective_new,fail_if_exists);error=GetLastError();log_memory_redirect(old_path,effective_old);log_memory_redirect(new_path,effective_new);log_line("FILE_COPY_FROM",0,(const BYTE*)old_path,old_path?(DWORD)lstrlenA(old_path):0,0,ok,error);log_line("FILE_COPY_TO",0,(const BYTE*)new_path,new_path?(DWORD)lstrlenA(new_path):0,0,ok,error);return ok;}
+BOOL WINAPI Trace_SetFileAttributesA(LPCSTR path,DWORD attributes){char fixed[MAX_PATH];LPCSTR effective=fix_application_path(path,fixed);BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=SetFileAttributesA(effective,attributes);error=GetLastError();log_memory_redirect(path,effective);log_line("FILE_ATTRIBUTES",0,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,attributes,ok,error);return ok;}
+BOOL WINAPI Trace_RemoveDirectoryA(LPCSTR path){char fixed[MAX_PATH];LPCSTR effective=fix_application_path(path,fixed);BOOL ok;DWORD error;SetLastError(ERROR_SUCCESS);ok=RemoveDirectoryA(effective);error=GetLastError();log_memory_redirect(path,effective);log_line("FILE_RMDIR",0,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,0,ok,error);return ok;}
+HANDLE WINAPI Trace_FindFirstFileA(LPCSTR path,LPWIN32_FIND_DATAA data){char fixed[MAX_PATH];LPCSTR effective=fix_application_path(path,fixed);HANDLE h;DWORD error;SetLastError(ERROR_SUCCESS);h=FindFirstFileA(effective,data);error=GetLastError();log_memory_redirect(path,effective);log_line("FILE_FIND_FIRST",h,(const BYTE*)path,path?(DWORD)lstrlenA(path):0,0,h!=INVALID_HANDLE_VALUE,error);return h;}
 static VOID WINAPI Trace_PostQuitMessage(int exit_code);
 
 static FARPROC trace_target(const char *name){
@@ -185,6 +186,10 @@ static FARPROC trace_target(const char *name){
     if(equals_i(name,"fopen"))return (FARPROC)Trace_fopen;
     if(equals_i(name,"fwrite"))return (FARPROC)Trace_fwrite;
     if(equals_i(name,"fclose"))return (FARPROC)Trace_fclose;
+    if(equals_i(name,"CopyFileA"))return (FARPROC)Trace_CopyFileA;
+    if(equals_i(name,"SetFileAttributesA"))return (FARPROC)Trace_SetFileAttributesA;
+    if(equals_i(name,"RemoveDirectoryA"))return (FARPROC)Trace_RemoveDirectoryA;
+    if(equals_i(name,"FindFirstFileA"))return (FARPROC)Trace_FindFirstFileA;
     if(equals_i(name,"PostQuitMessage"))return (FARPROC)Trace_PostQuitMessage;
     return 0;
 }
@@ -345,8 +350,8 @@ BOOL WINAPI HookGetCommState(HANDLE h,LPDCB d){
     EnterCriticalSection(&g_state_lock);*d=g_dcb;LeaveCriticalSection(&g_state_lock);log_line("GETCOMM",h,(const BYTE*)d,sizeof(*d),sizeof(*d),TRUE,0);return TRUE;
 }
 HANDLE WINAPI HookCreateFileA(LPCSTR name,DWORD access,DWORD share,LPSECURITY_ATTRIBUTES sa,DWORD creation,DWORD flags,HANDLE tmpl){
-    HANDLE h;DWORD error;
-    if(!is_com_path(name))return CreateFileA(name,access,share,sa,creation,flags,tmpl);
+    char fixed[MAX_PATH];LPCSTR effective;HANDLE h;DWORD error;
+    if(!is_com_path(name)){effective=fix_application_path(name,fixed);SetLastError(ERROR_SUCCESS);h=CreateFileA(effective,access,share,sa,creation,flags,tmpl);error=GetLastError();log_memory_redirect(name,effective);if(g_is_memory_process)log_line("MEMORY_CREATEFILE",h,(const BYTE*)name,name?(DWORD)lstrlenA(name):0,access,h!=INVALID_HANDLE_VALUE,error);return h;}
     EnterCriticalSection(&g_state_lock);
     if(g_comm!=INVALID_HANDLE_VALUE){LeaveCriticalSection(&g_state_lock);SetLastError(ERROR_SHARING_VIOLATION);return INVALID_HANDLE_VALUE;}
     if(!bridge_open()){error=GetLastError();bridge_close();LeaveCriticalSection(&g_state_lock);log_line("OPEN",INVALID_HANDLE_VALUE,(const BYTE*)name,name?(DWORD)lstrlenA(name):0,0,FALSE,error);SetLastError(error);return INVALID_HANDLE_VALUE;}
@@ -418,6 +423,7 @@ BOOL WINAPI DllMain(HINSTANCE module,DWORD reason,LPVOID reserved){
     (void)reserved;
     if(reason==DLL_PROCESS_ATTACH){
         g_module=module;InitializeCriticalSection(&g_state_lock);InitializeCriticalSection(&g_log_lock);DisableThreadLibraryCalls(module);
+        g_is_memory_process=main_executable_is("Memory.exe");
         set_module_directory();
         patch_main_file_iat();
         ZeroMemory(&g_timeouts,sizeof(g_timeouts));g_timeouts.ReadIntervalTimeout=200;g_timeouts.ReadTotalTimeoutConstant=200;g_timeouts.WriteTotalTimeoutConstant=1000;
